@@ -27,8 +27,8 @@
 // Button wiring:
 // RTC SDA: A4
 // RTC SCL: A5
-#define MINUS_BUTTON 7
-#define PLUS_BUTTON 6
+#define MINUS_BUTTON 6
+#define PLUS_BUTTON 7
 #define MODE_BUTTON 5
 #define BRIGHT_BUTTON 4
 
@@ -49,7 +49,10 @@ uint8_t mode = TIME_MODE;
 #define SETTINGS_NONE 0
 #define SETTINGS_MINUTE 1
 #define SETTINGS_HOUR 2
-#define MAX_SETTINGS_MODE 2
+#define SETTINGS_DAY 3
+#define SETTINGS_MONTH 4
+#define SETTINGS_YEAR 5
+#define MAX_SETTINGS_MODE 5
 
 // Button timings:
 #define BUTTON_DELAY 180
@@ -124,22 +127,22 @@ void loop()
 
   bool somethingHappened = false;
 
-  if (minusButtonState == HIGH && button_press_diff > BUTTON_DELAY)
+  if (button_press_diff > BUTTON_DELAY && (minusButtonState == HIGH || plusButtonState == HIGH))
   {
-    if (settingsMode==SETTINGS_MINUTE) {
-      increaseMinute(1);
-    } else if (settingsMode==SETTINGS_HOUR) {
-      increaseHour(1);
+    uint8_t inc = 1;
+    if (minusButtonState == HIGH) {
+      inc = -1;
     }
-    somethingHappened = true;
-  }
-
-  if (plusButtonState == HIGH && button_press_diff > BUTTON_DELAY)
-  {
     if (settingsMode==SETTINGS_MINUTE) {
-      increaseMinute(-1);
+      increaseMinute(inc);
     } else if (settingsMode==SETTINGS_HOUR) {
-      increaseHour(-1);
+      increaseHour(inc);
+    } else if (settingsMode==SETTINGS_DAY) {
+      increaseDay(inc);
+    } else if (settingsMode==SETTINGS_MONTH) {
+      increaseMonth(inc);
+    } else if (settingsMode==SETTINGS_YEAR) {
+      increaseYear(inc);
     }
     somethingHappened = true;
   }
@@ -265,18 +268,25 @@ void display()
 {
   if (settingsMode != SETTINGS_NONE)
   {
+
+    char timeStr[10];
     switch (settingsMode) {
       case SETTINGS_MINUTE:
-      char minString[10];
-      getNumberSettingsText(minString,"mm:",RTC.nowMin);
-      mx.print(minString);
+      getNumberSettingsText(timeStr,"mm:",RTC.nowMin);
       break;
       case SETTINGS_HOUR:
-      char hourString[10];
-      getNumberSettingsText(hourString,"hh:",RTC.nowHour);
-      mx.print(hourString);
+      getNumberSettingsText(timeStr,"hh:",RTC.nowHour);
       break;
+      case SETTINGS_DAY:
+      getNumberSettingsText(timeStr,"dd:",RTC.nowDay);
+      break;
+      case SETTINGS_MONTH:
+      getNumberSettingsText(timeStr,"MM:",RTC.nowMonth);
+      break;
+      case SETTINGS_YEAR:
+      getNumberSettingsText(timeStr,"YY:", RTC.nowYear);
     }
+    mx.print(timeStr);
   }
   else
   {
@@ -318,4 +328,46 @@ void increaseMinute(uint8_t incVal)
   }
 
   RTC.setTime(RTC.nowHour, newMinute, RTC.nowSec);
+}
+
+void increaseDay(uint8_t incVal) {
+  uint8_t newDay = 1;
+  newDay = RTC.nowDay + incVal;
+
+  if (newDay > 31)
+  {
+    newDay = 1;
+  } else if (newDay<1) {
+    newDay = 31;
+  }
+
+  RTC.setDate(newDay, RTC.nowMonth, RTC.nowYear);
+}
+
+void increaseMonth(uint8_t incVal) {
+  uint8_t newMonth = 1;
+  newMonth = RTC.nowMonth + incVal;
+
+  if (newMonth > 12)
+  {
+    newMonth = 1;
+  } else if (newMonth<1) {
+    newMonth = 12;
+  }
+
+  RTC.setDate(RTC.nowDay, newMonth, RTC.nowYear);
+}
+
+void increaseYear(uint8_t incVal) {
+  uint8_t newYear = 1;
+  newYear = RTC.nowYear + incVal;
+
+  if (newYear > 40)
+  {
+    newYear = 20;
+  } else if (newYear<20) {
+    newYear = 40;
+  }
+
+  RTC.setDate(RTC.nowDay, RTC.nowMonth, newYear);
 }
