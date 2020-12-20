@@ -14,10 +14,17 @@
 
 #include "MyDS3231.h"
 
+// Adafruit Sensor Library
+#include "DHT.h"
 
 
+
+//display
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
+
+// sensor
+#define DHTTYPE DHT22   // DHT 22  (AM2302)
 
 // Wiring:
 #define CLK_PIN 9  // or SCK
@@ -32,12 +39,17 @@
 #define MODE_BUTTON 5
 #define BRIGHT_BUTTON 4
 
+// Sensor wiring
+#define DHTPIN 2
+
 
 
 // Modes:
 #define TIME_MODE 0
-#define DATE_MODE 1
-#define MAX_MODE 1
+#define TEMP_MODE 1
+#define HUMI_MODE 2
+#define DATE_MODE 3
+#define MAX_MODE 3
 uint8_t mode = TIME_MODE;
 
 // Button press modes:
@@ -65,6 +77,9 @@ MyDS3231 RTC(0x68);
 // LED Display:
 MD_Parola mx = MD_Parola(HARDWARE_TYPE, DATA_PIN, CLK_PIN, CS_PIN, MAX_DEVICES);
 
+// Sensor:
+DHT dht(DHTPIN, DHTTYPE);
+
 uint8_t settingsMode = SETTINGS_NONE;
 
 uint8_t lastSecond = 0;
@@ -91,6 +106,10 @@ char dateString[11];
 
 char timeString[9];
 
+float humidity = 0.0;
+
+float temperature = 0.0;
+
 #define DELAYTIME 100;
 
 void setup()
@@ -107,17 +126,25 @@ void setup()
   mx.setIntensity(intensity);
   // Clear the display:
   mx.displayClear();
+
+  dht.begin();
 }
 
 void loop()
 {
 
-  if (mx.displayAnimate() && mode != TIME_MODE)
+  if (mx.displayAnimate() && mode == DATE_MODE)
   {
     mode = TIME_MODE;
   }
 
   RTC.nowDateTime();
+
+  // Reading temperature or humidity takes about 250 milliseconds!
+  // Sensor readings may also be up to 2 seconds 'old' (its a very slow sensor)
+  humidity = dht.readHumidity();
+  // Read temperature as Celsius
+  temperature = dht.readTemperature();
 
   uint8_t minusButtonState = digitalRead(MINUS_BUTTON);
   uint8_t plusButtonState = digitalRead(PLUS_BUTTON);
@@ -264,6 +291,15 @@ char* getNumberSettingsText(char* dest,  char* prefix, uint8_t number) {
   return dest;
 }
 
+char* getFloatText(char* dest, char* suffix, float number) {
+  dest[0]='\0';
+  char numberText[8];
+  dtostrf(number,4, 1, numberText);
+  strcat(dest,numberText);
+  strcat(dest,suffix);
+  return dest;
+}
+
 void display()
 {
   if (settingsMode != SETTINGS_NONE)
@@ -278,7 +314,7 @@ void display()
       getNumberSettingsText(timeStr,"hh:",RTC.nowHour);
       break;
       case SETTINGS_DAY:
-      getNumberSettingsText(timeStr,"dd:",RTC.nowDay);
+      getNumberSettingsText(timeStr,"DD:",RTC.nowDay);
       break;
       case SETTINGS_MONTH:
       getNumberSettingsText(timeStr,"MM:",RTC.nowMonth);
@@ -299,8 +335,16 @@ void display()
       break;
     case DATE_MODE:
         RTC.getDateString(timeString, false);
+        mx.displayClear();
         mx.displayScroll(timeString, PA_LEFT, PA_SCROLL_LEFT, 25);
-      
+        break;
+    case TEMP_MODE:
+        getFloatText(timeString," C",temperature);
+        mx.print(timeString);
+      break;
+    case HUMI_MODE:
+        getFloatText(timeString,"%",humidity);
+        mx.print(timeString);
       break;
     }
   }
